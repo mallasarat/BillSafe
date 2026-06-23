@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="BillSafe — Track receipts, return windows, and warranties. Never miss a return deadline again. Built for India.">
+  <meta name="theme-color" content="#080c14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>BillSafe — Warranty & Receipt Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="logo">
+        <span class="logo-icon">🧾</span>
+        <span class="logo-text">BillSafe</span>
+      </div>
+      <button class="notification-btn" id="notifBtn" title="Notifications" onclick="checkAlerts()">
+        <span class="notif-icon">🔔</span>
+        <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Alert Banner -->
+  <div id="alertBanner" class="alert-banner" style="display:none">
+    <span id="alertText"></span>
+    <button onclick="dismissBanner()" aria-label="Dismiss">✕</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       MAIN CONTENT
+  ═══════════════════════════════════════ -->
+  <main id="mainContent">
+
+    <!-- ─────────────────────────────────────
+         DASHBOARD
+    ───────────────────────────────────── -->
+    <section id="dashboardSection" class="section active">
+      <div class="section-header">
+        <h1>Your Bills</h1>
+        <p class="subtitle" id="dashSubtitle">Loading your receipts...</p>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+          <div class="stat-num" id="statTotal">0</div>
+          <div class="stat-label">Total Bills</div>
+        </div>
+        <div class="stat-card urgent">
+          <div class="stat-num" id="statUrgent">0</div>
+          <div class="stat-label">Expiring Soon</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statWarranties">0</div>
+          <div class="stat-label">Warranties</div>
+        </div>
+      </div>
+
+      <!-- Urgent Items -->
+      <div id="urgentSection" style="display:none">
+        <p class="section-title">⚠️ Act Now</p>
+        <div id="urgentCards" class="cards-grid"></div>
+      </div>
+
+      <!-- Upcoming Deadlines -->
+      <p class="section-title">📅 Upcoming Deadlines</p>
+      <div id="dashboardCards" class="cards-grid">
+        <div class="empty-state">
+          <div class="empty-icon">🧾</div>
+          <p>No receipts yet.<br>Add your first bill!</p>
+          <button class="btn-primary" onclick="showSection('addSection')" style="max-width:200px;margin:0 auto;">+ Add Receipt</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         ADD RECEIPT
+    ───────────────────────────────────── -->
+    <section id="addSection" class="section">
+      <div class="section-header">
+        <h1>Add Receipt</h1>
+        <p class="subtitle">Capture, upload, or paste your bill</p>
+      </div>
+
+      <div class="add-form-container">
+
+        <!-- STEP 1: Capture -->
+        <div id="step1" class="form-step active">
+          <p class="step-title">Step 1 of 2 — Get Your Receipt</p>
+
+          <div class="capture-options">
+            <button class="capture-btn" id="cameraBtn" onclick="startCamera()">
+              <span class="capture-icon">📸</span>
+              <span>Camera</span>
+            </button>
+            <button class="capture-btn" onclick="document.getElementById('fileInput').click()">
+              <span class="capture-icon">📁</span>
+              <span>Upload</span>
+            </button>
+            <button class="capture-btn" onclick="showPasteMode()">
+              <span class="capture-icon">📋</span>
+              <span>Paste Text</span>
+            </button>
+          </div>
+
+          <input type="file" id="fileInput" accept="image/*,.pdf" style="display:none" onchange="handleFileUpload(event)">
+
+          <!-- Camera Viewfinder -->
+          <div id="cameraContainer" style="display:none">
+            <video id="cameraFeed" autoplay playsinline muted></video>
+            <div class="camera-controls">
+              <button class="btn-capture" onclick="capturePhoto()">📸 Capture</button>
+              <button class="btn-secondary" onclick="stopCamera()">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Paste Text -->
+          <div id="pasteContainer" style="display:none">
+            <textarea id="pasteText" placeholder="Paste receipt text from WhatsApp, email, or SMS here...&#10;&#10;We'll auto-extract store name, date, amount &amp; GSTIN." rows="9"></textarea>
+            <button class="btn-primary" onclick="parseAndProceed()">Parse &amp; Continue →</button>
+          </div>
+
+          <!-- Image Preview + OCR -->
+          <div id="previewContainer" style="display:none">
+            <img id="receiptPreview" alt="Receipt preview">
+            <div id="ocrStatus" class="ocr-status">
+              <div class="ocr-spinner"></div>
+              <span id="ocrStatusText">Reading your receipt with AI OCR...</span>
+            </div>
+            <div class="preview-actions">
+              <button class="btn-primary" id="proceedBtn" onclick="proceedToStep2()" disabled>Continue →</button>
+              <button class="btn-secondary" onclick="resetCapture()" style="max-width:120px">Retake</button>
+            </div>
+          </div>
+
+          <!-- Skip option -->
+          <div style="text-align:center;margin-top:20px;">
+            <button class="btn-secondary" onclick="proceedToStep2()" style="max-width:200px;background:none;border:none;color:var(--text-muted);font-size:13px;text-decoration:underline;">
+              Skip — enter manually
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 2: Details -->
+        <div id="step2" class="form-step">
+          <p class="step-title">Step 2 of 2 — Confirm Details</p>
+
+          <div class="form-group">
+            <label for="retailerSelect">Store / Retailer</label>
+            <select id="retailerSelect" onchange="onRetailerChange()">
+              <option value="">-- Select Store --</option>
+            </select>
+            <input type="text" id="storeNameInput" placeholder="Or type store name here..." class="mt-8">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="purchaseDateInput">Purchase Date</label>
+              <input type="date" id="purchaseDateInput" onchange="updateDeadlinePreviews()">
+            </div>
+            <div class="form-group">
+              <label for="amountInput">Amount (₹)</label>
+              <input type="number" id="amountInput" placeholder="0.00" min="0" step="0.01">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="categorySelect">Category</label>
+            <select id="categorySelect">
+              <option value="electronics">📱 Electronics / Mobile</option>
+              <option value="appliances">🏠 Home Appliances</option>
+              <option value="clothing">👕 Clothing / Fashion</option>
+              <option value="grocery">🛒 Grocery / FMCG</option>
+              <option value="quick-commerce">⚡ Quick Commerce</option>
+              <option value="furniture">🪑 Furniture</option>
+              <option value="beauty">💄 Beauty / Personal Care</option>
+              <option value="other">📦 Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="gstinInput">GSTIN (from bill)</label>
+            <input type="text" id="gstinInput" placeholder="e.g. 27AAPFU0939F1ZV" maxlength="15" style="text-transform:uppercase;letter-spacing:1px;font-family:monospace">
+          </div>
+
+          <!-- Deadline Settings -->
+          <div class="deadlines-section">
+            <h4>⏱️ Deadline Settings</h4>
+
+            <div class="deadline-row">
+              <div class="deadline-toggle">
+                <label class="toggle-label" for="returnToggle">
+                  <input type="checkbox" id="returnToggle" checked onchange="updateDeadlinePreviews()">
+                  <span class="toggle-text">Return Window</span>
+                </label>
+                <div class="deadline-days">
+                  <input type="number" id="returnDays" value="7" min="1" max="365" onchange="updateDeadlinePreviews()" style="width:56px">
+                  <span>days</span>
+                </div>
+              </div>
+              <div class="deadline-badge" id="returnDeadlinePreview">-</div>
+            </div>
+
+            <div class="deadline-row">
+              <div class="deadline-toggle">
+                <label class="toggle-label" for="warrantyToggle">
+                  <input type="checkbox" id="warrantyToggle" onchange="updateDeadlinePreviews()">
+                  <span class="toggle-text">Warranty</span>
+                </label>
+                <div class="deadline-days">
+                  <input type="number" id="warrantyMonths" value="12" min="1" max="120" onchange="updateDeadlinePreviews()" style="width:56px">
+                  <span>months</span>
+                </div>
+              </div>
+              <div class="deadline-badge" id="warrantyDeadlinePreview">Off</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="notesInput">Notes</label>
+            <textarea id="notesInput" placeholder="Serial number, model name, claim reference, important details..." rows="3"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-secondary" onclick="goToStep1()" style="max-width:100px">← Back</button>
+            <button class="btn-primary" onclick="saveReceipt()">💾 Save Receipt</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         RECEIPTS LIST
+    ───────────────────────────────────── -->
+    <section id="receiptsSection" class="section">
+      <div class="section-header">
+        <h1>My Bills</h1>
+        <div class="search-bar">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Search by store, category..." oninput="filterReceipts()">
+        </div>
+      </div>
+
+      <div class="filter-chips" id="filterChips">
+        <button class="chip active" onclick="setFilter('all', this)">All</button>
+        <button class="chip" onclick="setFilter('urgent', this)">⚠️ Urgent</button>
+        <button class="chip" onclick="setFilter('active', this)">✅ Active</button>
+        <button class="chip" onclick="setFilter('expired', this)">⚫ Expired</button>
+      </div>
+
+      <div id="receiptsList" class="cards-grid"></div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         WARRANTY CLAIMS
+    ───────────────────────────────────── -->
+    <section id="claimsSection" class="section">
+      <div class="section-header">
+        <h1>Warranty Claims</h1>
+        <p class="subtitle">Track and manage your claims</p>
+      </div>
+
+      <div id="claimsList" class="claims-list"></div>
+
+
+    </section>
+
+    <!-- ─────────────────────────────────────
+         SETTINGS
+    ───────────────────────────────────── -->
+    <section id="settingsSection" class="section">
+      <div class="section-header">
+        <h1>Settings</h1>
+      </div>
+
+      <div class="settings-list">
+        <div class="settings-item">
+          <div>
+            <div class="settings-label">🔔 Browser Notifications</div>
+            <div class="settings-desc">Get nudges at 30, 14, 7, 3 &amp; 1 day before deadlines</div>
+          </div>
+          <button class="btn-small" id="notifPermBtn" onclick="requestNotifPermission()">Enable</button>
+        </div>
+
+        <div class="settings-item">
+          <div>
+            <div class="settings-label">📅 Default Return Window</div>
+            <div class="settings-desc">Used when retailer is unknown or not in our list</div>
+          </div>
+          <select id="defaultReturnDays" style="width:auto;padding:6px 32px 6px 12px;font-size:13px;">
+            <option value="3">3 days</option>
+            <option value="7" selected>7 days</option>
+            <option value="10">10 days</option>
+            <option value="15">15 days</option>
+            <option value="30">30 days</option>
+          </select>
+        </div>
+
+        <div class="settings-item">
+          <div>
+            <div class="settings-label">💾 Storage Used</div>
+            <div class="settings-desc" id="storageUsed">Calculating...</div>
+          </div>
+        </div>
+
+        <div class="settings-item danger-zone">
+          <div>
+            <div class="settings-label">🗑️ Clear All Data</div>
+            <div class="settings-desc">Permanently delete all receipts from this device</div>
+          </div>
+          <button class="btn-danger" onclick="clearAllData()">Clear</button>
+        </div>
+      </div>
+
+      <div class="app-info">
+        <p>🇮🇳 BillSafe v1.0 — Made for India</p>
+        <p>All data is stored locally on your device.<br>No account needed. No data shared.</p>
+        <p style="margin-top:12px;font-size:11px;">OCR powered by Tesseract.js · Runs 100% in-browser</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════
+       BOTTOM NAVIGATION
+  ═══════════════════════════════════════ -->
+  <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+    <button class="nav-item active" onclick="showSection('dashboardSection')" id="nav-dashboard" aria-label="Home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" onclick="showSection('receiptsSection')" id="nav-receipts" aria-label="My Bills">
+      <span class="nav-icon">🧾</span>
+      <span class="nav-label">Bills</span>
+    </button>
+    <button class="nav-fab" onclick="showSection('addSection')" id="nav-add" aria-label="Add Receipt">
+      <span>+</span>
+    </button>
+    <button class="nav-item" onclick="showSection('claimsSection')" id="nav-claims" aria-label="Claims">
+      <span class="nav-icon">🔧</span>
+      <span class="nav-label">Claims</span>
+    </button>
+    <button class="nav-item" onclick="showSection('settingsSection')" id="nav-settings" aria-label="Settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Settings</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- ═══════════════════════════════════════
+     RECEIPT DETAIL MODAL
+═══════════════════════════════════════ -->
+<div id="receiptModal" class="modal-overlay" style="display:none" onclick="closeModal(event)" role="dialog" aria-modal="true" aria-label="Receipt Details">
+  <div class="modal-content" id="modalContent">
+    <!-- Populated by app.js -->
+  </div>
+</div>
+
+<!-- Hidden canvas for camera capture -->
+<canvas id="captureCanvas" style="display:none" aria-hidden="true"></canvas>
+
+<!-- Scripts — load retailers + parser first, then core app, then Tesseract lazily -->
+<script src="retailers.js"></script>
+<script src="gst-parser.js"></script>
+<script src="notifications.js"></script>
+<script src="app.js"></script>
+<script>
+  // Calculate storage usage in settings
+  window.addEventListener('load', () => {
+    try {
+      const data = localStorage.getItem('billsafe_receipts_v2') || '';
+      const kb = (new Blob([data]).size / 1024).toFixed(1);
+      const el = document.getElementById('storageUsed');
+      if (el) el.textContent = `${kb} KB used (localStorage)`;
+    } catch(e) {}
+  });
+</script>
+<!-- Tesseract.js loaded from CDN (only downloaded when OCR is needed) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</body>
+</html>
